@@ -5,6 +5,8 @@ import time
 import json
 load_dotenv()
 
+SUBSCRIPTION = False
+HISTORICAL_DATA = 7 # days for data retrieval 
 API_KEY = os.getenv("APCA-API-KEY-ID")
 API_SECRET_KEY = os.getenv("APCA-API-SECRET-KEY")
 BASE_URL = 'https://data.alpaca.markets/v2'
@@ -15,11 +17,28 @@ headers = {
     "APCA-API-SECRET-KEY": API_SECRET_KEY
 }
 
-stock_list = ['AAPL', 'MSFT', 'AMZN', 'TSLA', 'GOOGL']
+stock_list = ['MSFT', 'AMZN', 'TSLA', 'GOOGL', 'AAPL']
+
+from datetime import datetime, timedelta
+
+import pytz
 
 def get_bars(stock):
     try:
-        response = requests.get(f'{BASE_URL}/stocks/{stock}/bars', headers=headers, params={"timeframe": '1Min'})
+        utc_now = datetime.now(pytz.UTC)  # Get current time in UTC
+
+        if SUBSCRIPTION:
+            end_time = utc_now
+        else:
+            end_time = utc_now - timedelta(minutes=16)
+
+        start_time = end_time - timedelta(days=HISTORICAL_DATA) # adjust as needed
+
+        start = start_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+        end = end_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+
+        response = requests.get(f'{BASE_URL}/stocks/{stock}/bars', headers=headers, 
+                                params={"timeframe": '1W', 'start': start, 'end': end})
         data = response.json()
         if 'bars' in data:
             bars_data = data['bars']
