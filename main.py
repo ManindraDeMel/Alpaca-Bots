@@ -31,7 +31,7 @@ def get_positions():
         positions = response.json()
         return {position['symbol']: position for position in positions}
     except Exception as e:
-        print(f"Error getting positions: {str(e)}")
+        print(f"Error getting positions: {str(e)}\n")
         return {}
 
 def get_account():
@@ -40,7 +40,7 @@ def get_account():
         account_info = response.json()
         return account_info
     except Exception as e:
-        print(f"Error getting account information: {str(e)}")
+        print(f"Error getting account information: {str(e)}\n")
         return None
 
 def get_bars(stock):
@@ -64,11 +64,11 @@ def get_bars(stock):
             bars_data = data['bars']
             return bars_data
         else:
-            print(f"No bars data for {stock}")
+            print(f"No bars data for {stock}\n")
             return []
         
     except Exception as e:
-        print(f"Error retrieving data for {stock}")
+        print(f"Error retrieving data for {stock}\n")
         print(str(e))
         return []
 
@@ -109,15 +109,21 @@ def sell_order(stock, qty):
             "time_in_force": "gtc"
         }
         r = requests.post(ALPACA_ORDERS_URL, headers=headers, json=order)
-        print(f"Sold order: {json.dumps(r.json(), indent=2)}")
+        print(f"Sold order: {json.dumps(r.json(), indent=2)}\n")
     except Exception as e:
-        print(f"Error selling order: {str(e)}")
+        print(f"Error selling order: {str(e)}\n")
 
 def trading_time():
     now = datetime.now(pytz.timezone('America/New_York'))
     open_time = datetime(now.year, now.month, now.day, hour=9, minute=30, tzinfo=pytz.timezone('America/New_York'))
     close_time = datetime(now.year, now.month, now.day, hour=16, tzinfo=pytz.timezone('America/New_York'))
+
+    # Check if current day of the week is a weekday
+    if now.weekday() >= 5:  # 0-4 corresponds to Monday-Friday
+        return False
+
     return open_time <= now <= close_time
+
 
 def main():
     while True:
@@ -139,9 +145,9 @@ def main():
                         sell_order(stock, capital)
                         print(f"Selling {stock}")
                     else:
-                        print(f"Holding position for stock: {stock}")
+                        print(f"Holding position for stock: {stock}\n")
         else:
-            print("Market is closed. Waiting for it to open...")
+            print("Market is closed. Waiting for it to open...\n")
         time.sleep(60)
 
 if __name__ == "__main__":
