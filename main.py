@@ -3,6 +3,8 @@ import os
 from dotenv import load_dotenv
 import time
 import json
+from datetime import datetime, timedelta
+import pytz
 load_dotenv()
 
 SUBSCRIPTION = False
@@ -18,10 +20,6 @@ headers = {
 }
 
 stock_list = ['MSFT', 'AMZN', 'TSLA', 'GOOGL', 'AAPL']
-
-from datetime import datetime, timedelta
-
-import pytz
 
 def get_bars(stock):
     try:
@@ -46,6 +44,7 @@ def get_bars(stock):
         else:
             print(f"No bars data for {stock}")
             return []
+        
     except Exception as e:
         print(f"Error retrieving data for {stock}")
         print(str(e))
@@ -99,6 +98,8 @@ def main():
             elif short_ma < long_ma:
                 sell_order(stock, capital)
                 print(f"Selling {stock}")
+            else:
+                print(f"Holding position for stock: {stock}")
         time.sleep(60)
 
 if __name__ == "__main__":
