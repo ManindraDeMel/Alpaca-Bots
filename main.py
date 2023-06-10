@@ -3,7 +3,6 @@ import os
 from dotenv import load_dotenv
 import time
 import json
-import threading
 load_dotenv()
 
 API_KEY = os.getenv("APCA-API-KEY-ID")
@@ -18,30 +17,33 @@ headers = {
 
 stock_list = ['AAPL', 'MSFT', 'AMZN', 'TSLA', 'GOOGL']
 
-
 def get_bars(stock):
-    response = requests.get(f'{BASE_URL}/stocks/{stock}/bars', headers=headers, params={"timeframe": '1Min'})
-    data = response.json()
-    bars_data = data['bars']
-    return bars_data
+    try:
+        response = requests.get(f'{BASE_URL}/stocks/{stock}/bars', headers=headers, params={"timeframe": '1Min'})
+        data = response.json()
+        if 'bars' in data:
+            bars_data = data['bars']
+            return bars_data
+        else:
+            print(f"No bars data for {stock}")
+            return []
+    except Exception as e:
+        print(f"Error retrieving data for {stock}")
+        print(str(e))
+        return []
 
-def calculate_roc(stock_list):
-    roc_values = {}
-    for stock in stock_list:
-        try:
-            bars = get_bars(stock)
-            if len(bars) >= 2:
-                current_price = bars[-1]['c']
-                past_price = bars[-2]['c']
-                roc = ((current_price - past_price) / past_price) * 100
-                roc_values[stock] = roc
-            else:
-                print(f"Not enough data for {stock}")
-        except Exception as e:
-            print(f"Error retrieving data for {stock}")
-            print(str(e))
-    sorted_roc = sorted(roc_values.items(), key=lambda x: x[1], reverse=True)
-    return sorted_roc
+def get_moving_averages(stock, short_period=5, long_period=20):
+    bars = get_bars(stock)
+    if len(bars) < long_period:
+        return None, None
+
+    short_period_prices = [bar['c'] for bar in bars[-short_period:]]
+    long_period_prices = [bar['c'] for bar in bars[-long_period:]]
+
+    short_ma = sum(short_period_prices) / short_period
+    long_ma = sum(long_period_prices) / long_period
+
+    return short_ma, long_ma
 
 def place_order(stock, capital):
     order = {
@@ -65,37 +67,20 @@ def sell_order(stock, qty):
     r = requests.post(ALPACA_ORDERS_URL, headers=headers, json=order)
     print(f"Sold order: {json.dumps(r.json(), indent=2)}")
 
-def get_current_price(stock):
-    response = requests.get(f'{BASE_URL}/stocks/{stock}/bars', headers=headers, params={"timeframe": '1Min'})
-    data = response.json()
-    current_price = data['bars'][-1]['c']
-    return current_price
-
-def check_and_sell(stock, qty, bought_price):
-    while True:
-        print(f"Waiting to sell: {stock}\n")
-        current_price = get_current_price(stock)
-        if ((current_price - bought_price) / bought_price) >= 0.02:
-            sell_order(stock, qty)
-            print(f"Selling {stock}")
-            break
-        time.sleep(60)
-
 def main():
     while True:
-        sorted_roc = calculate_roc(stock_list)
-        for stock, roc in sorted_roc:
-            barset = get_bars(stock)
-            ask_price = barset[-1]['c']  # get the close price of the last bar
-            last_traded_price = barset[-2]['c']  # get the close price of the second last bar
-            if ask_price > last_traded_price:
-                capital = 100  # adjust this to your capital
+        for stock in stock_list:
+            short_ma, long_ma = get_moving_averages(stock)
+            if short_ma is None:
+                continue
+            capital = 100  # adjust this to your capital
+            if short_ma > long_ma:
                 place_order(stock, capital)
                 print(f"Buying {stock}")
-                thread = threading.Thread(target=check_and_sell, args=(stock, capital, ask_price))
-                thread.start()
+            elif short_ma < long_ma:
+                sell_order(stock, capital)
+                print(f"Selling {stock}")
         time.sleep(60)
-
 
 if __name__ == "__main__":
     main()
