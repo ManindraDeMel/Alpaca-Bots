@@ -140,10 +140,10 @@ def main():
 
                     if short_ma > long_ma:
                         place_order(stock, capital)
-                        print(f"Buying {stock}")
+                        print(f"Buying {stock}\n")
                     elif short_ma < long_ma and stock in positions:
                         sell_order(stock, capital)
-                        print(f"Selling {stock}")
+                        print(f"Selling {stock}\n")
                     else:
                         print(f"Holding position for stock: {stock}\n")
         else:
