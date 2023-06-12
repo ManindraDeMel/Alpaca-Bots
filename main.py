@@ -128,33 +128,29 @@ def trading_time():
 def main():
     while True:
         if trading_time():
-            account_info = get_account()
-            if account_info is not None:
-                capital = min(100, float(account_info['cash']))  # adjust this to your capital
-                positions = get_positions()
-                for key in positions:
-                    print(key)
-
                 for stock in stock_list:
-                    short_ma, long_ma = get_moving_averages(stock)
-                    if short_ma is None:
-                        continue
-
-                    if short_ma > long_ma:
-                        if capital > 0:
-                            place_order(stock, capital)
-                            print(f"Buying {stock}\n")
+                    account_info = get_account()
+                    if account_info is not None:
+                        short_ma, long_ma = get_moving_averages(stock)
+                        capital = min(100, float(account_info['cash']))  # adjust this to your capital
+                        positions = get_positions()
+                        if short_ma is None:
+                            continue
+                        if short_ma > long_ma:
+                            if capital > 0:
+                                place_order(stock, capital)
+                                print(f"Buying {stock}\n")
+                            else:
+                                print(f"No Capital left to buy (Holding {stock}) \n")
+                        elif short_ma < long_ma and stock in positions:
+                            qty = int(positions[stock]['qty'])
+                            if qty > 0:
+                                sell_order(stock, qty)
+                                print(f"Selling {stock}\n")
+                            else:
+                                print(f"No quantity of {stock} to sell")
                         else:
-                            print("No Capital left to buy (Holding) \n")
-                    elif short_ma < long_ma and stock in positions:
-                        qty = int(positions[stock]['qty'])
-                        if qty > 0:
-                            sell_order(stock, capital)
-                            print(f"Selling {stock}\n")
-                        else:
-                            print(f"No quantity of {stock} to sell")
-                    else:
-                        print(f"Holding position for stock: {stock}\n")
+                            print(f"Holding position for stock: {stock}\n")
         else:
             print("Market is closed. Waiting for it to open...\n")
         time.sleep(60)
