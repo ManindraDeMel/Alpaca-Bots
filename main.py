@@ -95,7 +95,7 @@ def place_order(stock, qty):
             "time_in_force": "gtc"
         }
         r = requests.post(ALPACA_ORDERS_URL, headers=headers, json=order)
-        print(f"Placed order: {json.dumps(r.json(), indent=2)}")
+        print(f"Response: {json.dumps(r.json(), indent=2)}\n")
     except Exception as e:
         print(f"Error placing order: {str(e)}")
 
@@ -109,7 +109,7 @@ def sell_order(stock, qty):
             "time_in_force": "gtc"
         }
         r = requests.post(ALPACA_ORDERS_URL, headers=headers, json=order)
-        print(f"Sold order: {json.dumps(r.json(), indent=2)}\n")
+        print(f"####\nSold order: {json.dumps(r.json(), indent=2)}\n")
     except Exception as e:
         print(f"Error selling order: {str(e)}\n")
 
@@ -132,6 +132,8 @@ def main():
             if account_info is not None:
                 capital = min(100, float(account_info['cash']))  # adjust this to your capital
                 positions = get_positions()
+                for key in positions:
+                    print(key)
 
                 for stock in stock_list:
                     short_ma, long_ma = get_moving_averages(stock)
@@ -139,11 +141,18 @@ def main():
                         continue
 
                     if short_ma > long_ma:
-                        place_order(stock, capital)
-                        print(f"Buying {stock}\n")
+                        if capital > 0:
+                            place_order(stock, capital)
+                            print(f"Buying {stock}\n")
+                        else:
+                            print("No Capital left to buy (Holding) \n")
                     elif short_ma < long_ma and stock in positions:
-                        sell_order(stock, capital)
-                        print(f"Selling {stock}\n")
+                        qty = int(positions[stock]['qty'])
+                        if qty > 0:
+                            sell_order(stock, capital)
+                            print(f"Selling {stock}\n")
+                        else:
+                            print(f"No quantity of {stock} to sell")
                     else:
                         print(f"Holding position for stock: {stock}\n")
         else:
