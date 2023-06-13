@@ -113,21 +113,26 @@ def sell_order(stock, qty):
     except Exception as e:
         print(f"Error selling order: {str(e)}\n")
 
-def trading_time():
-    now = datetime.now(pytz.timezone('America/New_York'))
-    open_time = datetime(now.year, now.month, now.day, hour=9, minute=30, tzinfo=pytz.timezone('America/New_York'))
-    close_time = datetime(now.year, now.month, now.day, hour=16, tzinfo=pytz.timezone('America/New_York'))
+def get_clock():
+    try:
+        response = requests.get('https://paper-api.alpaca.markets/v2/clock', headers=headers)
+        clock_info = response.json()
+        return clock_info
+    except Exception as e:
+        print(f"Error getting clock information: {str(e)}\n")
+        return None
 
-    # Check if current day of the week is a weekday
-    if now.weekday() >= 5:  # 0-4 corresponds to Monday-Friday
+def is_market_open():
+    clock_info = get_clock()
+    if clock_info is not None:
+        return clock_info['is_open']
+    else:
         return False
-
-    return open_time <= now <= close_time
 
 
 def main():
     while True:
-        if trading_time():
+        if is_market_open():
                 for stock in stock_list:
                     account_info = get_account()
                     if account_info is not None:
