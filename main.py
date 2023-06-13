@@ -137,12 +137,14 @@ def main():
                     account_info = get_account()
                     if account_info is not None:
                         short_ma, long_ma = get_moving_averages(stock)
-                        capital = min(100, float(account_info['cash']))  # adjust this to your capital
+                        capital = float(account_info['cash'])  # adjust this to your capital
                         positions = get_positions()
                         if short_ma is None:
                             continue
                         if short_ma > long_ma:
                             if capital > 0:
+                                stock_budget = capital * 0.10 
+                                place_order(stock, stock_budget)
                                 place_order(stock, capital)
                                 print(f"Buying {stock}\n")
                             else:
