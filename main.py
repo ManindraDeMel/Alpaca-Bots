@@ -3,99 +3,181 @@ import os
 from dotenv import load_dotenv
 import time
 import json
-import threading
+from datetime import datetime, timedelta
+import pytz
 load_dotenv()
 
+SUBSCRIPTION = False
+SHORT_PERIOD = 1 # day/s
+LONG_PERIOD = 5 # day/s
+HISTORICAL_DATA = 4 # weeks for data retrieval 
 API_KEY = os.getenv("APCA-API-KEY-ID")
 API_SECRET_KEY = os.getenv("APCA-API-SECRET-KEY")
 BASE_URL = 'https://data.alpaca.markets/v2'
 ALPACA_ORDERS_URL = 'https://paper-api.alpaca.markets/v1/orders'
+ALPACA_POSITIONS_URL = 'https://paper-api.alpaca.markets/v1/positions'
+ALPACA_ACCOUNT_URL = 'https://paper-api.alpaca.markets/v1/account'
 
 headers = {
     "APCA-API-KEY-ID": API_KEY,
     "APCA-API-SECRET-KEY": API_SECRET_KEY
 }
 
-stock_list = ['AAPL', 'MSFT', 'AMZN', 'TSLA', 'GOOGL']
+stock_list = ['MSFT', 'AMZN', 'TSLA', 'GOOGL', 'AAPL']
 
+def get_positions():
+    try:
+        response = requests.get(ALPACA_POSITIONS_URL, headers=headers)
+        positions = response.json()
+        return {position['symbol']: position for position in positions}
+    except Exception as e:
+        print(f"Error getting positions: {str(e)}\n")
+        return {}
+
+def get_account():
+    try:
+        response = requests.get(ALPACA_ACCOUNT_URL, headers=headers)
+        account_info = response.json()
+        return account_info
+    except Exception as e:
+        print(f"Error getting account information: {str(e)}\n")
+        return None
 
 def get_bars(stock):
-    response = requests.get(f'{BASE_URL}/stocks/{stock}/bars', headers=headers, params={"timeframe": '1Min'})
-    data = response.json()
-    bars_data = data['bars']
-    return bars_data
+    try:
+        utc_now = datetime.now(pytz.UTC)  # Get current time in UTC
 
-def calculate_roc(stock_list):
-    roc_values = {}
-    for stock in stock_list:
-        try:
-            bars = get_bars(stock)
-            if len(bars) >= 2:
-                current_price = bars[-1]['c']
-                past_price = bars[-2]['c']
-                roc = ((current_price - past_price) / past_price) * 100
-                roc_values[stock] = roc
-            else:
-                print(f"Not enough data for {stock}")
-        except Exception as e:
-            print(f"Error retrieving data for {stock}")
-            print(str(e))
-    sorted_roc = sorted(roc_values.items(), key=lambda x: x[1], reverse=True)
-    return sorted_roc
+        if SUBSCRIPTION:
+            end_time = utc_now
+        else:
+            end_time = utc_now - timedelta(minutes=16)
 
-def place_order(stock, capital):
-    order = {
-        "symbol": stock,
-        "qty": capital,
-        "side": "buy",
-        "type": "market",
-        "time_in_force": "gtc"
-    }
-    r = requests.post(ALPACA_ORDERS_URL, headers=headers, json=order)
-    print(f"Placed order: {json.dumps(r.json(), indent=2)}")
+        start_time = end_time - timedelta(weeks=HISTORICAL_DATA) # adjust as needed
+
+        start = start_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+        end = end_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+
+        response = requests.get(f'{BASE_URL}/stocks/{stock}/bars', headers=headers, 
+                                params={"timeframe": '1D', 'start': start, 'end': end})
+        data = response.json()
+        if 'bars' in data:
+            bars_data = data['bars']
+            return bars_data
+        else:
+            print(f"No bars data for {stock}\n")
+            return []
+        
+    except Exception as e:
+        print(f"Error retrieving data for {stock}\n")
+        print(str(e))
+        return []
+
+def get_moving_averages(stock, short_period=SHORT_PERIOD, long_period=LONG_PERIOD):
+    bars = get_bars(stock)
+    if len(bars) < long_period:
+        return None, None
+
+    short_period_prices = [bar['c'] for bar in bars[-short_period:]]
+    long_period_prices = [bar['c'] for bar in bars[-long_period:]]
+
+    short_ma = sum(short_period_prices) / short_period
+    long_ma = sum(long_period_prices) / long_period
+
+    return short_ma, long_ma
+
+def place_order(stock, qty):
+    try:
+        order = {
+            "symbol": stock,
+            "qty": qty,
+            "side": "buy",
+            "type": "market",
+            "time_in_force": "gtc"
+        }
+        r = requests.post(ALPACA_ORDERS_URL, headers=headers, json=order)
+        print(f"Response: {json.dumps(r.json(), indent=2)}\n")
+    except Exception as e:
+        print(f"Error placing order: {str(e)}")
 
 def sell_order(stock, qty):
-    order = {
-        "symbol": stock,
-        "qty": qty,
-        "side": "sell",
-        "type": "market",
-        "time_in_force": "gtc"
-    }
-    r = requests.post(ALPACA_ORDERS_URL, headers=headers, json=order)
-    print(f"Sold order: {json.dumps(r.json(), indent=2)}")
+    try:
+        order = {
+            "symbol": stock,
+            "qty": qty,
+            "side": "sell",
+            "type": "market",
+            "time_in_force": "gtc"
+        }
+        r = requests.post(ALPACA_ORDERS_URL, headers=headers, json=order)
+        print(f"####\nSold order: {json.dumps(r.json(), indent=2)}\n")
+    except Exception as e:
+        print(f"Error selling order: {str(e)}\n")
 
-def get_current_price(stock):
-    response = requests.get(f'{BASE_URL}/stocks/{stock}/bars', headers=headers, params={"timeframe": '1Min'})
-    data = response.json()
-    current_price = data['bars'][-1]['c']
-    return current_price
+def get_clock():
+    try:
+        response = requests.get('https://paper-api.alpaca.markets/v2/clock', headers=headers)
+        clock_info = response.json()
+        return clock_info
+    except Exception as e:
+        print(f"Error getting clock information: {str(e)}\n")
+        return None
 
-def check_and_sell(stock, qty, bought_price):
-    while True:
-        print(f"Waiting to sell: {stock}\n")
-        current_price = get_current_price(stock)
-        if ((current_price - bought_price) / bought_price) >= 0.02:
-            sell_order(stock, qty)
-            print(f"Selling {stock}")
-            break
-        time.sleep(60)
+def is_market_open():
+    clock_info = get_clock()
+    if clock_info is not None:
+        return clock_info['is_open']
+    else:
+        return False
+
+def get_latest_price(stock):
+    bars = get_bars(stock)
+    if bars:
+        # The latest bar contains the most recent prices
+        latest_bar = bars[-1]
+        return latest_bar['c']
+    else:
+        return None
 
 def main():
     while True:
-        sorted_roc = calculate_roc(stock_list)
-        for stock, roc in sorted_roc:
-            barset = get_bars(stock)
-            ask_price = barset[-1]['c']  # get the close price of the last bar
-            last_traded_price = barset[-2]['c']  # get the close price of the second last bar
-            if ask_price > last_traded_price:
-                capital = 100  # adjust this to your capital
-                place_order(stock, capital)
-                print(f"Buying {stock}")
-                thread = threading.Thread(target=check_and_sell, args=(stock, capital, ask_price))
-                thread.start()
+        if is_market_open():
+            for stock in stock_list:
+                account_info = get_account()
+                if account_info is not None:
+                    short_ma, long_ma = get_moving_averages(stock)
+                    capital = float(account_info['cash'])  # total capital available
+                    positions = get_positions()
+                    if short_ma is None:
+                        continue
+                    if short_ma > long_ma:
+                        if capital > 0:
+                            # Spend only 10% of available capital per stock
+                            stock_budget = capital * 0.2
+                            # Get current price of the stock
+                            current_price = get_latest_price(stock)
+                            if current_price is not None:
+                                qty = int(stock_budget / current_price)
+                                if (qty >= 1):
+                                    place_order(stock, qty)
+                                    print(f"Buying {qty} share/s of {stock}\n")
+                                else:
+                                    print(f"Not enough money to buy {stock} (price: {current_price})\n")                                
+                            else:
+                                print(f"Unable to retrieve current price for {stock}\n")
+                        else:
+                            print(f"No Capital left to buy (Holding {stock}) \n")
+                    elif short_ma < long_ma and stock in positions:
+                        qty = int(positions[stock]['qty'])
+                        if qty > 0:
+                            sell_order(stock, qty)
+                            print(f"Selling {stock}\n")
+                        else:
+                            print(f"No quantity of {stock} to sell")
+                    else:
+                        print(f"Holding position for stock: {stock}\n")
+        else:
+            print("Market is closed. Waiting for it to open...\n")
         time.sleep(60)
-
 
 if __name__ == "__main__":
     main()
