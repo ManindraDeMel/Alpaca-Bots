@@ -161,7 +161,7 @@ def main():
                                     place_order(stock, qty)
                                     print(f"Buying {qty} share/s of {stock}\n")
                                 else:
-                                    print(f"Not enough money to buy {qty} (price: {current_price}) of {stock}\n")                                
+                                    print(f"Not enough money to buy {stock} (price: {current_price})\n")                                
                             else:
                                 print(f"Unable to retrieve current price for {stock}\n")
                         else:
