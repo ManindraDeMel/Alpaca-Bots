@@ -129,35 +129,52 @@ def is_market_open():
     else:
         return False
 
+def get_latest_price(stock):
+    bars = get_bars(stock)
+    if bars:
+        # The latest bar contains the most recent prices
+        latest_bar = bars[-1]
+        return latest_bar['c']
+    else:
+        return None
 
 def main():
     while True:
         if is_market_open():
-                for stock in stock_list:
-                    account_info = get_account()
-                    if account_info is not None:
-                        short_ma, long_ma = get_moving_averages(stock)
-                        capital = float(account_info['cash'])  # adjust this to your capital
-                        positions = get_positions()
-                        if short_ma is None:
-                            continue
-                        if short_ma > long_ma:
-                            if capital > 0:
-                                stock_budget = capital * 0.10 
-                                place_order(stock, stock_budget)
-                                place_order(stock, capital)
-                                print(f"Buying {stock}\n")
+            for stock in stock_list:
+                account_info = get_account()
+                if account_info is not None:
+                    short_ma, long_ma = get_moving_averages(stock)
+                    capital = float(account_info['cash'])  # total capital available
+                    positions = get_positions()
+                    if short_ma is None:
+                        continue
+                    if short_ma > long_ma:
+                        if capital > 0:
+                            # Spend only 10% of available capital per stock
+                            stock_budget = capital * 0.2
+                            # Get current price of the stock
+                            current_price = get_latest_price(stock)
+                            if current_price is not None:
+                                qty = int(stock_budget / current_price)
+                                if (qty >= 1):
+                                    place_order(stock, qty)
+                                    print(f"Buying {qty} share/s of {stock}\n")
+                                else:
+                                    print(f"Not enough money to buy {qty} (price: {current_price}) of {stock}\n")                                
                             else:
-                                print(f"No Capital left to buy (Holding {stock}) \n")
-                        elif short_ma < long_ma and stock in positions:
-                            qty = int(positions[stock]['qty'])
-                            if qty > 0:
-                                sell_order(stock, qty)
-                                print(f"Selling {stock}\n")
-                            else:
-                                print(f"No quantity of {stock} to sell")
+                                print(f"Unable to retrieve current price for {stock}\n")
                         else:
-                            print(f"Holding position for stock: {stock}\n")
+                            print(f"No Capital left to buy (Holding {stock}) \n")
+                    elif short_ma < long_ma and stock in positions:
+                        qty = int(positions[stock]['qty'])
+                        if qty > 0:
+                            sell_order(stock, qty)
+                            print(f"Selling {stock}\n")
+                        else:
+                            print(f"No quantity of {stock} to sell")
+                    else:
+                        print(f"Holding position for stock: {stock}\n")
         else:
             print("Market is closed. Waiting for it to open...\n")
         time.sleep(60)
